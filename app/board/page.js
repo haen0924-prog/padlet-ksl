@@ -114,13 +114,14 @@ function DrawingCanvas({ onSave, onClose }) {
   )
 }
 
-function DraggableCard({ opinion, hasSticker, stickerCount, onToggle, isAdmin }) {
+function DraggableCard({ opinion, hasSticker, stickerCount, onToggle, isAdmin, onDelete, currentMemberId }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: opinion.id })
+  const { setNodeRef: setDropRef, isOver } = useDroppable({ id: `card-${opinion.id}` })
   const style = {
     transform: transform ? `translate(${transform.x}px, ${transform.y}px)` : undefined,
     opacity: isDragging ? 0.3 : 1,
-    background: '#fffde7',
-    border: '1px solid #f9e44a',
+    background: isOver ? '#fef9c3' : '#fffde7',
+    border: isOver ? '2px solid #f59e0b' : '1px solid #f9e44a',
     borderRadius: '10px',
     padding: '12px',
     width: '150px',
@@ -135,6 +136,7 @@ function DraggableCard({ opinion, hasSticker, stickerCount, onToggle, isAdmin })
     position: 'relative',
   }
   return (
+    <div ref={setDropRef} style={{ position: 'relative' }}>
     <div ref={setNodeRef} style={style} {...listeners} {...attributes}>
       {opinion.video_url
         ? <video src={opinion.video_url} controls style={{ width: '100%', borderRadius: '6px', marginBottom: '8px' }} onPointerDown={e => e.stopPropagation()} />
@@ -144,6 +146,14 @@ function DraggableCard({ opinion, hasSticker, stickerCount, onToggle, isAdmin })
       }
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         {!isAdmin && <small style={{ color: '#94a3b8', fontSize: '11px', pointerEvents: 'none' }}>{opinion.ksl_members?.name}</small>}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginLeft: 'auto' }}>
+          {(isAdmin || opinion.member_id === currentMemberId) && (
+            <button
+              onClick={e => { e.stopPropagation(); onDelete(opinion) }}
+              onPointerDown={e => e.stopPropagation()}
+              style={{ background: 'none', border: 'none', color: '#fca5a5', cursor: 'pointer', fontSize: '14px', padding: '2px' }}
+            >🗑️</button>
+          )}
         <button
           onClick={e => { e.stopPropagation(); onToggle(opinion.id) }}
           onPointerDown={e => e.stopPropagation()}
@@ -151,12 +161,14 @@ function DraggableCard({ opinion, hasSticker, stickerCount, onToggle, isAdmin })
         >
           {hasSticker ? '⭐' : '☆'} {stickerCount}
         </button>
+        </div>
       </div>
+    </div>
     </div>
   )
 }
 
-function DroppableGroup({ group, opinions, hasSticker, getStickerCount, onToggle, onTitleChange, onDelete, isAdmin }) {
+function DroppableGroup({ group, opinions, hasSticker, getStickerCount, onToggle, onTitleChange, onDelete, isAdmin, onDeleteOpinion, currentMemberId }) {
   const { setNodeRef, isOver } = useDroppable({ id: `group-${group.id}` })
   return (
     <div style={{ background: isOver ? '#f0f4ff' : '#f8fafc', border: `2px dashed ${isOver ? '#6366f1' : '#cbd5e1'}`, borderRadius: '14px', padding: '16px', minHeight: '160px', flex: '1 1 250px' }}>
@@ -166,7 +178,7 @@ function DroppableGroup({ group, opinions, hasSticker, getStickerCount, onToggle
       </div>
       <div ref={setNodeRef} style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', minHeight: '80px' }}>
         {opinions.map(o => (
-          <DraggableCard key={o.id} opinion={o} hasSticker={hasSticker(o.id)} stickerCount={getStickerCount(o.id)} onToggle={onToggle} isAdmin={isAdmin} />
+          <DraggableCard key={o.id} opinion={o} hasSticker={hasSticker(o.id)} stickerCount={getStickerCount(o.id)} onToggle={onToggle} isAdmin={isAdmin} onDelete={onDeleteOpinion} currentMemberId={currentMemberId} />
         ))}
         {opinions.length === 0 && <p style={{ color: '#cbd5e1', fontSize: '13px', margin: 'auto' }}>여기에 카드를 드래그하세요</p>}
       </div>
@@ -174,12 +186,12 @@ function DroppableGroup({ group, opinions, hasSticker, getStickerCount, onToggle
   )
 }
 
-function DroppableUnassigned({ opinions, hasSticker, getStickerCount, onToggle, isAdmin }) {
+function DroppableUnassigned({ opinions, hasSticker, getStickerCount, onToggle, isAdmin, onDelete, currentMemberId }) {
   const { setNodeRef, isOver } = useDroppable({ id: 'unassigned' })
   return (
     <div ref={setNodeRef} style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', minHeight: '80px', background: isOver ? '#f0f4ff' : 'transparent', borderRadius: '10px', padding: '4px', transition: 'background 0.2s' }}>
       {opinions.map(o => (
-        <DraggableCard key={o.id} opinion={o} hasSticker={hasSticker(o.id)} stickerCount={getStickerCount(o.id)} onToggle={onToggle} isAdmin={isAdmin} />
+        <DraggableCard key={o.id} opinion={o} hasSticker={hasSticker(o.id)} stickerCount={getStickerCount(o.id)} onToggle={onToggle} isAdmin={isAdmin} onDelete={onDelete} currentMemberId={currentMemberId} />
       ))}
     </div>
   )
@@ -203,7 +215,9 @@ export default function BoardPage() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [showDrawing, setShowDrawing] = useState(null)
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 3 } })
+  )
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -319,6 +333,22 @@ export default function BoardPage() {
     }
   }, [currentMember])
 
+  async function deleteOpinion(opinion) {
+    if (!confirm('이 카드를 삭제할까요?')) return
+    if (opinion.image_url) {
+      const fileName = opinion.image_url.split('/').pop()
+      await supabase.storage.from('drawings').remove([fileName])
+    }
+    if (opinion.video_url) {
+      const fileName = opinion.video_url.split('/').pop()
+      await supabase.storage.from('videos').remove([fileName])
+    }
+    await supabase.from('ksl_card_groups').delete().eq('opinion_id', opinion.id)
+    await supabase.from('ksl_stickers').delete().eq('opinion_id', opinion.id)
+    await supabase.from('ksl_opinions').delete().eq('id', opinion.id)
+    isAdmin ? fetchAllData() : fetchOpinions()
+  }
+
   async function submitVideo(questionId, file) {
     if (file.size > 100 * 1024 * 1024) {
       alert('영상 파일이 너무 커요! 100MB 이하만 가능해요.')
@@ -394,9 +424,11 @@ export default function BoardPage() {
 
   async function handleDragEnd(event) {
     const { active, over } = event
+    console.log('dragEnd:', active?.id, over?.id)
     setActiveId(null)
     if (!over) return
     const overId = over.id
+
     if (overId === 'unassigned') {
       await supabase.from('ksl_card_groups').delete().eq('opinion_id', active.id)
       setCardGroups(prev => { const u = { ...prev }; delete u[active.id]; return u })
@@ -404,6 +436,32 @@ export default function BoardPage() {
       const groupId = parseInt(overId.replace('group-', ''))
       await supabase.from('ksl_card_groups').upsert([{ opinion_id: active.id, group_id: groupId }], { onConflict: 'opinion_id' })
       setCardGroups(prev => ({ ...prev, [active.id]: groupId }))
+    } else if (String(overId).startsWith('card-')) {
+      const targetOpinionId = parseInt(overId.replace('card-', ''))
+      if (targetOpinionId === active.id) return
+
+      const activeOpinion = opinions.find(o => o.id === active.id)
+      const targetOpinion = opinions.find(o => o.id === targetOpinionId)
+      if (!activeOpinion || !targetOpinion) return
+
+      const targetGroupId = cardGroups[targetOpinionId]
+
+      if (targetGroupId) {
+        // 타겟 카드가 이미 그룹에 있으면 그 그룹에 넣기
+        await supabase.from('ksl_card_groups').upsert([{ opinion_id: active.id, group_id: targetGroupId }], { onConflict: 'opinion_id' })
+        setCardGroups(prev => ({ ...prev, [active.id]: targetGroupId }))
+      } else {
+        // 둘 다 그룹이 없으면 새 그룹 생성
+        const questionId = activeOpinion.question_id
+        const { data } = await supabase.from('ksl_groups').insert([{ question_id: questionId, title: '', order_num: (groups[questionId] || []).length }]).select()
+        if (data && data[0]) {
+          const newGroupId = data[0].id
+          await supabase.from('ksl_card_groups').upsert([{ opinion_id: active.id, group_id: newGroupId }], { onConflict: 'opinion_id' })
+          await supabase.from('ksl_card_groups').upsert([{ opinion_id: targetOpinionId, group_id: newGroupId }], { onConflict: 'opinion_id' })
+          setGroups(prev => ({ ...prev, [questionId]: [...(prev[questionId] || []), data[0]] }))
+          setCardGroups(prev => ({ ...prev, [active.id]: newGroupId, [targetOpinionId]: newGroupId }))
+        }
+      }
     }
   }
 
@@ -452,12 +510,12 @@ export default function BoardPage() {
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <div style={{ marginBottom: '16px' }}>
             <p style={{ fontSize: '13px', color: '#94a3b8', marginBottom: '10px' }}>📌 미분류 카드</p>
-            <DroppableUnassigned opinions={unassigned} hasSticker={hasSticker} getStickerCount={getStickerCount} onToggle={toggleSticker} isAdmin={isAdmin} />
+            <DroppableUnassigned opinions={unassigned} hasSticker={hasSticker} getStickerCount={getStickerCount} onToggle={toggleSticker} isAdmin={isAdmin} onDelete={deleteOpinion} currentMemberId={currentMember?.id} />
           </div>
           {qGroups.length > 0 && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
               {qGroups.map(group => (
-                <DroppableGroup key={group.id} group={group} opinions={qOpinions.filter(o => cardGroups[o.id] === group.id)} hasSticker={hasSticker} getStickerCount={getStickerCount} onToggle={toggleSticker} onTitleChange={(gid, title) => updateGroupTitle(q.id, gid, title)} onDelete={(gid) => deleteGroup(q.id, gid)} isAdmin={isAdmin} />
+                <DroppableGroup key={group.id} group={group} opinions={qOpinions.filter(o => cardGroups[o.id] === group.id)} hasSticker={hasSticker} getStickerCount={getStickerCount} onToggle={toggleSticker} onTitleChange={(gid, title) => updateGroupTitle(q.id, gid, title)} onDelete={(gid) => deleteGroup(q.id, gid)} isAdmin={isAdmin} onDeleteOpinion={deleteOpinion} currentMemberId={currentMember?.id} />
               ))}
             </div>
           )}
@@ -470,11 +528,7 @@ export default function BoardPage() {
           </DragOverlay>
         </DndContext>
 
-        {isAdmin && (
-          <button onClick={() => addGroup(q.id)} style={{ background: '#f8f7ff', color: '#6366f1', border: '2px dashed #c7d2fe', borderRadius: '10px', padding: '10px 20px', cursor: 'pointer', fontSize: '14px', fontWeight: '600', marginBottom: '16px', width: '100%' }}>
-            + 그룹 추가
-          </button>
-        )}
+        
 
         {!isAdmin && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
