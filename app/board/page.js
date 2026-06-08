@@ -1,8 +1,118 @@
 'use client'
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { DndContext, PointerSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
+
+function DrawingCanvas({ onSave, onClose }) {
+  const canvasRef = React.useRef(null)
+  const [isDrawing, setIsDrawing] = useState(false)
+  const [color, setColor] = useState('#000000')
+  const [lineWidth, setLineWidth] = useState(4)
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    const ctx = canvas.getContext('2d')
+    ctx.fillStyle = '#fffde7'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+  }, [])
+
+  function getPos(e, canvas) {
+    const rect = canvas.getBoundingClientRect()
+    const scaleX = canvas.width / rect.width
+    const scaleY = canvas.height / rect.height
+    if (e.touches) {
+      return {
+        x: (e.touches[0].clientX - rect.left) * scaleX,
+        y: (e.touches[0].clientY - rect.top) * scaleY
+      }
+    }
+    return {
+      x: (e.clientX - rect.left) * scaleX,
+      y: (e.clientY - rect.top) * scaleY
+    }
+  }
+
+  function startDraw(e) {
+    e.preventDefault()
+    const canvas = canvasRef.current
+    const ctx = canvas.getContext('2d')
+    const pos = getPos(e, canvas)
+    ctx.beginPath()
+    ctx.moveTo(pos.x, pos.y)
+    setIsDrawing(true)
+  }
+
+  function draw(e) {
+    e.preventDefault()
+    if (!isDrawing) return
+    const canvas = canvasRef.current
+    const ctx = canvas.getContext('2d')
+    const pos = getPos(e, canvas)
+    ctx.lineTo(pos.x, pos.y)
+    ctx.strokeStyle = color
+    ctx.lineWidth = lineWidth
+    ctx.lineCap = 'round'
+    ctx.stroke()
+  }
+
+  function endDraw(e) {
+    e.preventDefault()
+    setIsDrawing(false)
+  }
+
+  function clearCanvas() {
+    const canvas = canvasRef.current
+    const ctx = canvas.getContext('2d')
+    ctx.fillStyle = '#fffde7'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+  }
+
+  function saveDrawing() {
+    const canvas = canvasRef.current
+    canvas.toBlob(blob => onSave(blob), 'image/png')
+  }
+
+  return (
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+      <div style={{ background: 'white', borderRadius: '16px', padding: '20px', width: '90%', maxWidth: '500px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+          <h3 style={{ margin: 0, color: '#1e293b' }}>🎨 그림 그리기</h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#94a3b8' }}>✕</button>
+        </div>
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', alignItems: 'center' }}>
+          <label style={{ fontSize: '13px', color: '#64748b' }}>색상:</label>
+          {['#000000', '#e74c3c', '#3498db', '#27ae60', '#f39c12', '#9b59b6'].map(c => (
+            <button key={c} onClick={() => setColor(c)} style={{ width: '24px', height: '24px', borderRadius: '50%', background: c, border: color === c ? '3px solid #6366f1' : '2px solid #e2e8f0', cursor: 'pointer' }} />
+          ))}
+          <label style={{ fontSize: '13px', color: '#64748b', marginLeft: '8px' }}>굵기:</label>
+          {[2, 4, 8].map(w => (
+            <button key={w} onClick={() => setLineWidth(w)} style={{ width: '28px', height: '28px', borderRadius: '6px', border: lineWidth === w ? '2px solid #6366f1' : '1px solid #e2e8f0', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ width: `${w * 2}px`, height: `${w * 2}px`, borderRadius: '50%', background: '#334155' }} />
+            </button>
+          ))}
+        </div>
+        <canvas
+          ref={canvasRef}
+          width={460}
+          height={300}
+          style={{ border: '1px solid #e2e8f0', borderRadius: '8px', width: '100%', touchAction: 'none', cursor: 'crosshair', background: '#fffde7' }}
+          onMouseDown={startDraw}
+          onMouseMove={draw}
+          onMouseUp={endDraw}
+          onMouseLeave={endDraw}
+          onTouchStart={startDraw}
+          onTouchMove={draw}
+          onTouchEnd={endDraw}
+        />
+        <div style={{ display: 'flex', gap: '8px', marginTop: '12px', justifyContent: 'flex-end' }}>
+          <button onClick={clearCanvas} style={{ background: '#f1f5f9', color: '#64748b', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>지우기</button>
+          <button onClick={saveDrawing} style={{ background: '#6366f1', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>등록하기</button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function DraggableCard({ opinion, hasSticker, stickerCount, onToggle, isAdmin }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: opinion.id })
@@ -26,9 +136,14 @@ function DraggableCard({ opinion, hasSticker, stickerCount, onToggle, isAdmin })
   }
   return (
     <div ref={setNodeRef} style={style} {...listeners} {...attributes}>
-      <p style={{ margin: '0 0 8px 0', fontSize: '13px', color: '#334155', lineHeight: '1.5', pointerEvents: 'none' }}>{opinion.content}</p>
+      {opinion.video_url
+        ? <video src={opinion.video_url} controls style={{ width: '100%', borderRadius: '6px', marginBottom: '8px' }} onPointerDown={e => e.stopPropagation()} />
+        : opinion.image_url
+          ? <img src={opinion.image_url} alt="그림" style={{ width: '100%', borderRadius: '6px', marginBottom: '8px', pointerEvents: 'none' }} />
+          : <p style={{ margin: '0 0 8px 0', fontSize: '13px', color: '#334155', lineHeight: '1.5', pointerEvents: 'none' }}>{opinion.content}</p>
+      }
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <small style={{ color: '#94a3b8', fontSize: '11px', pointerEvents: 'none' }}>{opinion.ksl_members?.name}</small>
+        {!isAdmin && <small style={{ color: '#94a3b8', fontSize: '11px', pointerEvents: 'none' }}>{opinion.ksl_members?.name}</small>}
         <button
           onClick={e => { e.stopPropagation(); onToggle(opinion.id) }}
           onPointerDown={e => e.stopPropagation()}
@@ -46,7 +161,7 @@ function DroppableGroup({ group, opinions, hasSticker, getStickerCount, onToggle
   return (
     <div style={{ background: isOver ? '#f0f4ff' : '#f8fafc', border: `2px dashed ${isOver ? '#6366f1' : '#cbd5e1'}`, borderRadius: '14px', padding: '16px', minHeight: '160px', flex: '1 1 250px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-        <input value={group.title} onChange={e => onTitleChange(group.id, e.target.value)} placeholder="그룹 이름 입력" style={{ fontWeight: '700', fontSize: '14px', color: '#6366f1', background: 'transparent', border: 'none', borderBottom: '2px solid #c7d2fe', outline: 'none', width: '100%', padding: '2px 4px' }} />
+        <span></span>
         {isAdmin && <button onClick={() => onDelete(group.id)} style={{ background: 'none', border: 'none', color: '#cbd5e1', cursor: 'pointer', fontSize: '16px', marginLeft: '8px', flexShrink: 0 }}>✕</button>}
       </div>
       <div ref={setNodeRef} style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', minHeight: '80px' }}>
@@ -85,6 +200,8 @@ export default function BoardPage() {
   const [activeId, setActiveId] = useState(null)
   const [teams, setTeams] = useState([])
   const [selectedTeamAdmin, setSelectedTeamAdmin] = useState(null)
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
+  const [showDrawing, setShowDrawing] = useState(null)
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
 
@@ -201,6 +318,39 @@ export default function BoardPage() {
       fetchGroupData()
     }
   }, [currentMember])
+
+  async function submitVideo(questionId, file) {
+    if (file.size > 100 * 1024 * 1024) {
+      alert('영상 파일이 너무 커요! 100MB 이하만 가능해요.')
+      return
+    }
+    const fileName = `video-${Date.now()}.${file.name.split('.').pop()}`
+    const { data, error } = await supabase.storage.from('videos').upload(fileName, file, { contentType: file.type })
+    if (error) { console.error(error); return }
+    const { data: urlData } = supabase.storage.from('videos').getPublicUrl(fileName)
+    await supabase.from('ksl_opinions').insert([{
+      question_id: questionId,
+      member_id: currentMember.id,
+      content: '(영상)',
+      video_url: urlData.publicUrl
+    }])
+    fetchOpinions()
+  }
+
+  async function submitDrawing(questionId, blob) {
+    const fileName = `drawing-${Date.now()}.png`
+    const { data, error } = await supabase.storage.from('drawings').upload(fileName, blob, { contentType: 'image/png' })
+    if (error) { console.error(error); return }
+    const { data: urlData } = supabase.storage.from('drawings').getPublicUrl(fileName)
+    await supabase.from('ksl_opinions').insert([{
+      question_id: questionId,
+      member_id: currentMember.id,
+      content: '(그림)',
+      image_url: urlData.publicUrl
+    }])
+    setShowDrawing(null)
+    fetchOpinions()
+  }
 
   async function submitOpinion(questionId) {
     const content = newOpinion[questionId]
@@ -327,9 +477,18 @@ export default function BoardPage() {
         )}
 
         {!isAdmin && (
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <input placeholder="의견을 입력하세요" value={newOpinion[q.id] || ''} onChange={e => setNewOpinion(prev => ({ ...prev, [q.id]: e.target.value }))} onKeyDown={e => e.key === 'Enter' && submitOpinion(q.id)} style={{ flex: 1, padding: '12px 16px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '14px', outline: 'none' }} />
-            <button onClick={() => submitOpinion(q.id)} style={{ background: '#6366f1', color: 'white', border: 'none', padding: '12px 20px', borderRadius: '10px', cursor: 'pointer', fontWeight: '600', fontSize: '14px' }}>등록</button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <input placeholder="의견을 입력하세요" value={newOpinion[q.id] || ''} onChange={e => setNewOpinion(prev => ({ ...prev, [q.id]: e.target.value }))} onKeyDown={e => e.key === 'Enter' && submitOpinion(q.id)} style={{ flex: 1, padding: '12px 16px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '14px', outline: 'none' }} />
+              <button onClick={() => submitOpinion(q.id)} style={{ background: '#6366f1', color: 'white', border: 'none', padding: '12px 20px', borderRadius: '10px', cursor: 'pointer', fontWeight: '600', fontSize: '14px' }}>등록</button>
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={() => setShowDrawing(q.id)} style={{ flex: 1, background: '#fef3c7', color: '#d97706', border: '1px solid #fcd34d', padding: '10px', borderRadius: '10px', cursor: 'pointer', fontWeight: '600', fontSize: '14px' }}>🎨 그림으로 작성</button>
+              <label style={{ flex: 1, background: '#f0fdf4', color: '#16a34a', border: '1px solid #86efac', padding: '10px', borderRadius: '10px', cursor: 'pointer', fontWeight: '600', fontSize: '14px', textAlign: 'center' }}>
+                📹 영상 올리기
+                <input type="file" accept="video/*" style={{ display: 'none' }} onChange={e => { if (e.target.files[0]) submitVideo(q.id, e.target.files[0]) }} />
+              </label>
+            </div>
           </div>
         )}
       </div>
@@ -369,7 +528,7 @@ export default function BoardPage() {
                     const gOpinions = qOpinions.filter(o => cardGroups[o.id] === group.id)
                     return (
                       <div key={group.id} style={{ background: '#f8fafc', border: '2px solid #e2e8f0', borderRadius: '14px', padding: '16px', flex: '1 1 200px' }}>
-                        <p style={{ fontWeight: '700', fontSize: '14px', color: '#6366f1', marginBottom: '12px' }}>{group.title || '(이름 없는 그룹)'}</p>
+                        <p style={{ fontWeight: '700', fontSize: '14px', color: '#6366f1', marginBottom: '12px' }}></p>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                           {gOpinions.map(o => (
                             <div key={o.id} style={{ background: '#fffde7', border: '1px solid #f9e44a', borderRadius: '10px', padding: '10px', width: '140px', minHeight: '80px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
@@ -411,6 +570,7 @@ export default function BoardPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#f8fafc', fontFamily: "'Noto Sans KR', sans-serif" }}>
+      {showDrawing && <DrawingCanvas onSave={(blob) => submitDrawing(showDrawing, blob)} onClose={() => setShowDrawing(null)} />}
       <div style={{ background: 'white', borderBottom: '1px solid #e2e8f0', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <span style={{ fontSize: '24px' }}>✋</span>
@@ -447,7 +607,65 @@ export default function BoardPage() {
             }
           </div>
         ) : (
-          questions.map((q, qi) => renderQuestion(q, qi))
+          <div>
+            {questions.length > 0 && currentQuestionIndex < questions.length && renderQuestion(questions[currentQuestionIndex], currentQuestionIndex)}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                {currentQuestionIndex > 0 && (
+                  <button
+                    onClick={() => setCurrentQuestionIndex(prev => prev - 1)}
+                    style={{ background: '#f1f5f9', color: '#64748b', border: 'none', padding: '12px 20px', borderRadius: '10px', cursor: 'pointer', fontWeight: '600', fontSize: '15px' }}
+                  >
+                    ← 이전
+                  </button>
+                )}
+                <span style={{ color: '#94a3b8', fontSize: '14px' }}>{currentQuestionIndex + 1} / {questions.length}</span>
+              </div>
+              {(() => {
+                if (!questions[currentQuestionIndex]) return null
+                const qId = questions[currentQuestionIndex].id
+                const qOpinions = opinions.filter(o => o.question_id === qId)
+                const myOpinion = qOpinions.filter(o => o.member_id === currentMember.id).length > 0
+                const teamMembers = members.filter(m => m.team_id === currentMember.team_id)
+                const allDone = teamMembers.every(m => qOpinions.some(o => o.member_id === m.id))
+                const doneCount = teamMembers.filter(m => qOpinions.some(o => o.member_id === m.id)).length
+
+                return currentQuestionIndex < questions.length - 1 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
+                    <span style={{ fontSize: '13px', color: allDone ? '#27ae60' : '#94a3b8' }}>
+                      {doneCount}/{teamMembers.length}명 작성 완료
+                    </span>
+                    <button
+                      onClick={() => {
+                        if (!myOpinion) { alert('내 의견을 먼저 작성해주세요!'); return }
+                        if (!allDone) { alert(`아직 ${teamMembers.length - doneCount}명이 작성 중이에요. 기다려주세요!`); return }
+                        setCurrentQuestionIndex(prev => prev + 1)
+                      }}
+                      style={{ background: allDone && myOpinion ? '#6366f1' : '#cbd5e1', color: 'white', border: 'none', padding: '12px 28px', borderRadius: '10px', cursor: 'pointer', fontWeight: '600', fontSize: '15px' }}
+                    >
+                      다음 →
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
+                    <span style={{ fontSize: '13px', color: allDone ? '#27ae60' : '#94a3b8' }}>
+                      {doneCount}/{teamMembers.length}명 작성 완료
+                    </span>
+                    <button
+                      onClick={() => {
+                        if (!myOpinion) { alert('내 의견을 먼저 작성해주세요!'); return }
+                        if (!allDone) { alert(`아직 ${teamMembers.length - doneCount}명이 작성 중이에요. 기다려주세요!`); return }
+                        alert('모든 질문에 답변 완료했어요! 수고하셨습니다 😊')
+                      }}
+                      style={{ background: allDone && myOpinion ? '#27ae60' : '#cbd5e1', color: 'white', border: 'none', padding: '12px 28px', borderRadius: '10px', cursor: 'pointer', fontWeight: '600', fontSize: '15px' }}
+                    >
+                      완료 ✓
+                    </button>
+                  </div>
+                )
+              })()}
+            </div>
+          </div>
         )}
       </div>
 
