@@ -424,7 +424,7 @@ export default function BoardPage() {
 
   async function handleDragEnd(event) {
     const { active, over } = event
-    console.log('dragEnd:', active?.id, over?.id)
+    
     setActiveId(null)
     if (!over) return
     const overId = over.id
@@ -631,10 +631,7 @@ export default function BoardPage() {
           <span style={{ fontWeight: '700', fontSize: '18px', color: '#1e293b' }}>실습 나눔 보드</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <button onClick={() => setView(view === 'board' ? 'result' : 'board')} style={{ background: view === 'result' ? '#6366f1' : '#f1f5f9', color: view === 'result' ? 'white' : '#64748b', border: 'none', padding: '8px 16px', borderRadius: '20px', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}>
-            {view === 'board' ? '📋 결과 보기' : '✏️ 보드로 돌아가기'}
-          </button>
-          {view === 'result' && (
+          {isAdmin && (
             <button onClick={() => window.print()} style={{ background: '#27ae60', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '20px', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}>
               🖨️ 인쇄
             </button>
