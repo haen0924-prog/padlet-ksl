@@ -124,7 +124,7 @@ function DraggableCard({ opinion, hasSticker, stickerCount, onToggle, isAdmin, o
     border: isOver ? '2px solid #f59e0b' : '1px solid #f9e44a',
     borderRadius: '10px',
     padding: '12px',
-    width: '150px',
+    width: 'clamp(130px, 40vw, 160px)',
     minHeight: '100px',
     display: 'flex',
     flexDirection: 'column',
@@ -147,7 +147,7 @@ function DraggableCard({ opinion, hasSticker, stickerCount, onToggle, isAdmin, o
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         {!isAdmin && <small style={{ color: '#94a3b8', fontSize: '11px', pointerEvents: 'none' }}>{opinion.ksl_members?.name}</small>}
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginLeft: 'auto' }}>
-          {(isAdmin || opinion.member_id === currentMemberId) && (
+          {!isAdmin && opinion.member_id === currentMemberId && (
             <button
               onClick={e => { e.stopPropagation(); onDelete(opinion) }}
               onPointerDown={e => e.stopPropagation()}
@@ -472,7 +472,7 @@ export default function BoardPage() {
   if (step === 'select') {
     return (
       <div style={{ minHeight: '100vh', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Noto Sans KR', sans-serif" }}>
-        <div style={{ background: 'white', borderRadius: '20px', padding: '40px', width: '100%', maxWidth: '420px', boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }}>
+        <div style={{ background: 'white', borderRadius: '20px', padding: '24px', width: '100%', maxWidth: '420px', boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }}>
           <div style={{ textAlign: 'center', marginBottom: '32px' }}>
             <div style={{ fontSize: '40px', marginBottom: '12px' }}>✋</div>
             <h1 style={{ fontSize: '22px', fontWeight: '700', color: '#1e293b', margin: '0 0 8px 0' }}>수어교원 실습 나눔 보드</h1>
@@ -501,7 +501,7 @@ export default function BoardPage() {
     const unassigned = qOpinions.filter(o => !cardGroups[o.id] || !qGroups.find(g => g.id === cardGroups[o.id]))
 
     return (
-      <div key={q.id} style={{ background: 'white', borderRadius: '16px', padding: '28px', marginBottom: '24px', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
+      <div key={q.id} style={{ background: 'white', borderRadius: '16px', padding: '16px', marginBottom: '16px', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
           <span style={{ background: '#6366f1', color: 'white', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '14px', flexShrink: 0 }}>Q{qi + 1}</span>
           <h2 style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: '#1e293b' }}>{q.content}</h2>
@@ -625,7 +625,7 @@ export default function BoardPage() {
   return (
     <div style={{ minHeight: '100vh', background: '#f8fafc', fontFamily: "'Noto Sans KR', sans-serif" }}>
       {showDrawing && <DrawingCanvas onSave={(blob) => submitDrawing(showDrawing, blob)} onClose={() => setShowDrawing(null)} />}
-      <div style={{ background: 'white', borderBottom: '1px solid #e2e8f0', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 10 }}>
+      <div style={{ background: 'white', borderBottom: '1px solid #e2e8f0', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <span style={{ fontSize: '24px' }}>✋</span>
           <span style={{ fontWeight: '700', fontSize: '18px', color: '#1e293b' }}>실습 나눔 보드</span>
@@ -642,7 +642,7 @@ export default function BoardPage() {
         </div>
       </div>
 
-      <div style={{ maxWidth: '960px', margin: '0 auto', padding: '32px 20px' }}>
+      <div style={{ maxWidth: '960px', margin: '0 auto', padding: '16px 12px' }}>
         {view === 'result' ? renderResult() : isAdmin ? (
           <div>
             <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
